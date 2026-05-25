@@ -313,14 +313,14 @@ function renderSummary(result) {
 
 function renderResultList(result) {
   const items = [
-    ["运营利润", fmtMoney(result.totalOperatingProfit)],
-    ["收车处置后利润", fmtMoney(result.totalDisposalProfit)],
-    ["客户首期支付", fmtMoney(result.initialPayment)],
-    ["初始风险敞口", fmtMoney(result.initialRiskExposure)],
-    ["初始支付比例", fmtPercent(result.initialRatio)],
-    ["租金年化 IRR", fmtPercent(result.rentIrr)],
     ["预计履行期数", `${result.runMonths} 个月`],
+    ["合同期数", `${result.input.customerTerm} 个月`],
+    ["车价总计", fmtMoney(result.vehicleTotal)],
+    ["当前命中折旧率", fmtPercent(result.currentDepRate)],
     ["融资每期租金", fmtMoney(result.financeMonthlyRent)],
+    ["融资首付", fmtMoney(result.financeDownPayment)],
+    ["融资服务费", fmtMoney(result.financeFee)],
+    ["估算年订单", numberFmt.format(result.annualOrders)],
     ["估算管理规模", `${numberFmt.format(result.fleetScale)} 台`]
   ];
   document.querySelector("#resultList").innerHTML = items
