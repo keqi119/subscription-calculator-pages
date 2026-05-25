@@ -16,147 +16,205 @@
     </header>
 
     <main class="app-shell">
-      <section class="summary-panel" aria-label="测算结果">
+      <section class="summary-panel" aria-label="方案结果摘要">
         <article class="hero-card">
           <span>运营利润</span>
           <strong id="operatingProfit">¥0</strong>
-          <small id="profitHint">含服务费、租金、持车成本、投流和管理费用</small>
+          <small>按本方案“预计履行期数”计算</small>
         </article>
         <div class="metric-grid">
-          <article>
-            <span>收车处置收益</span>
-            <strong id="disposalProfit">¥0</strong>
-          </article>
-          <article>
-            <span>客户首期支付</span>
-            <strong id="initialPayment">¥0</strong>
-          </article>
-          <article>
-            <span>初始风险敞口</span>
-            <strong id="riskExposure">¥0</strong>
-          </article>
-          <article>
-            <span>初始支付比例</span>
-            <strong id="initialRatio">0.0%</strong>
-          </article>
-          <article>
-            <span>租金年化 IRR</span>
-            <strong id="rentIrr">0.0%</strong>
-          </article>
-          <article>
-            <span>采购融资 IRR</span>
-            <strong id="financeIrr">0.0%</strong>
-          </article>
+          <article><span>收车处置后利润</span><strong id="disposalProfit">¥0</strong></article>
+          <article><span>客户首期支付</span><strong id="initialPayment">¥0</strong></article>
+          <article><span>初始风险敞口</span><strong id="riskExposure">¥0</strong></article>
+          <article><span>初始支付比例</span><strong id="initialRatio">0.0%</strong></article>
+          <article><span>租金年化 IRR</span><strong id="rentIrr">0.0%</strong></article>
+          <article><span>采购融资 IRR</span><strong id="financeIrr">0.0%</strong></article>
         </div>
       </section>
 
       <nav class="tabs" aria-label="测算模块">
-        <button class="active" data-tab="input" type="button">录入</button>
-        <button data-tab="result" type="button">结果</button>
-        <button data-tab="cashflow" type="button">明细</button>
+        <button class="active" data-tab="preset" type="button">预设参数</button>
+        <button data-tab="plan" type="button">具体方案</button>
+        <button data-tab="result" type="button">方案结果</button>
       </nav>
 
-      <section class="tab-page active" id="inputTab">
-        <form id="calcForm" class="form-stack">
-          <section class="input-section">
-            <div class="section-title">
-              <h2>车辆与客户方案</h2>
-              <p>对应原表左侧“车辆销售计价”和“客户方案”。</p>
-            </div>
-            <div class="field-grid">
-              <label>车辆销售价<input name="vehiclePrice" type="number" inputmode="decimal" /></label>
-              <label>牌照使用费<input name="plateUseFee" type="number" inputmode="decimal" /></label>
-              <label>初始车龄（月）<input name="initialAge" type="number" inputmode="numeric" /></label>
-              <label>押金<input name="deposit" type="number" inputmode="decimal" /></label>
-              <label>服务费-1<input name="serviceFee1" type="number" inputmode="decimal" /></label>
-              <label>服务费-2（代收保险）<input name="serviceFee2" type="number" inputmode="decimal" /></label>
-              <label>期数（月）<input name="customerTerm" type="number" inputmode="numeric" /></label>
-              <label>支付方式<select name="paymentMode"><option value="0">后付</option><option value="1">先付</option></select></label>
-              <label>每期租金<input name="monthlyRent" type="number" inputmode="decimal" /></label>
-              <label>留购价<input name="buyoutPrice" type="number" inputmode="decimal" /></label>
-              <label>起租日<input name="startDate" type="date" /></label>
-            </div>
-          </section>
+      <form id="calcForm">
+        <section class="tab-page active" id="presetTab">
+          <div class="section-stack">
+            <section class="input-section">
+              <div class="section-title">
+                <h2>采购融资方案</h2>
+                <p>管理采购端融资规则，影响资金成本和提前结清测算。</p>
+              </div>
+              <div class="field-grid">
+                <label>首付比例<input name="financeDownRatio" type="number" step="0.001" inputmode="decimal" /></label>
+                <label>保证金比例<input name="financeDepositRatio" type="number" step="0.001" inputmode="decimal" /></label>
+                <label>服务费比例<input name="financeFeeRatio" type="number" step="0.001" inputmode="decimal" /></label>
+                <label>融资期数<input name="financeTerm" type="number" inputmode="numeric" /></label>
+                <label>融资支付方式<select name="financePaymentMode"><option value="0">后付</option><option value="1">先付</option></select></label>
+                <label>融资利率（年）<input name="financeRate" type="number" step="0.001" inputmode="decimal" /></label>
+                <label>留购价比例<input name="financeBuyoutRatio" type="number" step="0.0001" inputmode="decimal" /></label>
+                <label>提前结清违约金比例<input name="earlySettlePenalty" type="number" step="0.001" inputmode="decimal" /></label>
+              </div>
+              <div class="inline-metrics">
+                <article><span>融资每期租金</span><strong id="financeMonthlyRent">¥0</strong></article>
+                <article><span>采购融资 IRR</span><strong id="financeIrrInline">0.0%</strong></article>
+              </div>
+            </section>
 
-          <section class="input-section">
-            <div class="section-title">
-              <h2>每期租金调整</h2>
-              <p>按期次填写租金调整金额，正数加收，负数减免。</p>
-            </div>
-            <div class="rent-adjustment-grid" id="rentAdjustmentGrid"></div>
-          </section>
+            <section class="input-section">
+              <div class="section-title">
+                <h2>经营效率</h2>
+                <p>用于估算线索、订单和管理规模，作为公共经营假设。</p>
+              </div>
+              <div class="field-grid">
+                <label>投流费用（年）<input name="trafficCostYear" type="number" inputmode="decimal" /></label>
+                <label>销售线索单价<input name="leadPrice" type="number" inputmode="decimal" /></label>
+                <label>转化率<input name="conversionRate" type="number" step="0.0001" inputmode="decimal" /></label>
+                <label>车队出租率<input name="utilization" type="number" step="0.001" inputmode="decimal" /></label>
+                <label>合同平均运行期数<input name="avgRunMonths" type="number" inputmode="numeric" /></label>
+              </div>
+              <div class="inline-metrics">
+                <article><span>估算年订单</span><strong id="annualOrders">0</strong></article>
+                <article><span>估算管理规模</span><strong id="fleetScale">0 台</strong></article>
+              </div>
+            </section>
 
-          <section class="input-section">
-            <div class="section-title">
-              <h2>采购融资方案</h2>
-              <p>用于推算采购端每期租金、资金成本和提前结清收益。</p>
-            </div>
-            <div class="field-grid">
-              <label>首付比例<input name="financeDownRatio" type="number" step="0.001" inputmode="decimal" /></label>
-              <label>保证金比例<input name="financeDepositRatio" type="number" step="0.001" inputmode="decimal" /></label>
-              <label>服务费比例<input name="financeFeeRatio" type="number" step="0.001" inputmode="decimal" /></label>
-              <label>融资期数<input name="financeTerm" type="number" inputmode="numeric" /></label>
-              <label>融资支付方式<select name="financePaymentMode"><option value="0">后付</option><option value="1">先付</option></select></label>
-              <label>融资利率（年）<input name="financeRate" type="number" step="0.001" inputmode="decimal" /></label>
-              <label>留购价比例<input name="financeBuyoutRatio" type="number" step="0.0001" inputmode="decimal" /></label>
-              <label>提前结清违约金比例<input name="earlySettlePenalty" type="number" step="0.001" inputmode="decimal" /></label>
-            </div>
-          </section>
+            <section class="input-section">
+              <div class="section-title">
+                <h2>成本口径</h2>
+                <p>维护持车、管理和交付相关成本。</p>
+              </div>
+              <div class="field-grid">
+                <label>维修保养（年）<input name="maintenanceYear" type="number" inputmode="decimal" /></label>
+                <label>保险费用（年）<input name="insuranceYear" type="number" inputmode="decimal" /></label>
+                <label>管理费用（年）<input name="adminCostYear" type="number" inputmode="decimal" /></label>
+                <label>电池租金（月）<input name="batteryRent" type="number" inputmode="decimal" /></label>
+                <label>牌照费用（月）<input name="plateMonthlyFee" type="number" inputmode="decimal" /></label>
+                <label>整备费用<input name="refurbishFee" type="number" inputmode="decimal" /></label>
+                <label>GPS及安装费<input name="gpsFee" type="number" inputmode="decimal" /></label>
+              </div>
+            </section>
 
-          <section class="input-section">
-            <div class="section-title">
-              <h2>经营成本与效率</h2>
-              <p>对应原表“测算基础”和“经营成本”。</p>
-            </div>
-            <div class="field-grid">
-              <label>维修保养（年）<input name="maintenanceYear" type="number" inputmode="decimal" /></label>
-              <label>保险费用（年）<input name="insuranceYear" type="number" inputmode="decimal" /></label>
-              <label>管理费用（年）<input name="adminCostYear" type="number" inputmode="decimal" /></label>
-              <label>投流费用（年）<input name="trafficCostYear" type="number" inputmode="decimal" /></label>
-              <label>销售线索单价<input name="leadPrice" type="number" inputmode="decimal" /></label>
-              <label>转化率<input name="conversionRate" type="number" step="0.0001" inputmode="decimal" /></label>
-              <label>车队出租率<input name="utilization" type="number" step="0.001" inputmode="decimal" /></label>
-              <label>佣金水平<input name="commissionRate" type="number" step="0.001" inputmode="decimal" /></label>
-              <label>合同平均运行期数<input name="avgRunMonths" type="number" inputmode="numeric" /></label>
-              <label>销售佣金<input name="salesCommission" type="number" inputmode="decimal" /></label>
-              <label>电池租金（月）<input name="batteryRent" type="number" inputmode="decimal" /></label>
-              <label>牌照费用（月）<input name="plateMonthlyFee" type="number" inputmode="decimal" /></label>
-              <label>整备费用<input name="refurbishFee" type="number" inputmode="decimal" /></label>
-              <label>GPS及安装费<input name="gpsFee" type="number" inputmode="decimal" /></label>
-            </div>
-          </section>
+            <section class="input-section">
+              <div class="section-title">
+                <h2>佣金规则</h2>
+                <p>佣金水平和销售佣金双向联动。</p>
+              </div>
+              <div class="field-grid compact">
+                <label>佣金水平<input name="commissionRate" type="number" step="0.001" inputmode="decimal" /></label>
+                <label>销售佣金<input name="salesCommission" type="number" inputmode="decimal" /></label>
+              </div>
+              <p class="formula-note">销售佣金 = 车辆销售价 × 佣金水平；手动修改销售佣金时会反算佣金水平。</p>
+            </section>
 
-          <section class="input-section">
-            <div class="section-title">
-              <h2>折旧率/月</h2>
-              <p>按当前车龄匹配区间，计算每期残值。</p>
-            </div>
-            <div class="depreciation-grid" id="depreciationGrid"></div>
-          </section>
-        </form>
-      </section>
+            <section class="input-section">
+              <div class="section-title">
+                <h2>折旧率表</h2>
+                <p>按当前车龄匹配区间，计算每期残值。</p>
+              </div>
+              <div class="depreciation-grid" id="depreciationGrid"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-page" id="planTab">
+          <div class="section-stack">
+            <section class="input-section">
+              <div class="section-title">
+                <h2>车辆信息</h2>
+                <p>本次客户方案对应的车辆基础信息。</p>
+              </div>
+              <div class="field-grid">
+                <label>车辆销售价<input name="vehiclePrice" type="number" inputmode="decimal" /></label>
+                <label>牌照使用费<input name="plateUseFee" type="number" inputmode="decimal" /></label>
+                <label>初始车龄（月）<input name="initialAge" type="number" inputmode="numeric" /></label>
+              </div>
+              <div class="inline-metrics">
+                <article><span>车价总计</span><strong id="vehicleTotal">¥0</strong></article>
+                <article><span>当前命中折旧率</span><strong id="currentDepRate">0.0%</strong></article>
+              </div>
+            </section>
+
+            <section class="input-section">
+              <div class="section-title">
+                <h2>客户付款方案</h2>
+                <p>本次报价给客户的押金、租金、服务费和留购安排。</p>
+              </div>
+              <div class="field-grid">
+                <label>押金<input name="deposit" type="number" inputmode="decimal" /></label>
+                <label>服务费-1<input name="serviceFee1" type="number" inputmode="decimal" /></label>
+                <label>服务费-2（代收保险）<input name="serviceFee2" type="number" inputmode="decimal" /></label>
+                <label>期数（月）<input name="customerTerm" type="number" inputmode="numeric" /></label>
+                <label>支付方式<select name="paymentMode"><option value="0">后付</option><option value="1">先付</option></select></label>
+                <label>每期租金<input name="monthlyRent" type="number" inputmode="decimal" /></label>
+                <label>留购价<input name="buyoutPrice" type="number" inputmode="decimal" /></label>
+                <label>起租日<input name="startDate" type="date" /></label>
+              </div>
+            </section>
+
+            <section class="input-section highlight-section">
+              <div class="section-title">
+                <h2>履约假设</h2>
+                <p>运营利润和收车处置后利润按这里的预计履行期数计算。</p>
+              </div>
+              <div class="field-grid compact">
+                <label>预计履行期数<input name="expectedRunMonths" type="number" inputmode="numeric" /></label>
+              </div>
+            </section>
+
+            <section class="input-section">
+              <div class="section-title split-title">
+                <div>
+                  <h2>每期租金调整</h2>
+                  <p>按期次填写租金调整金额，正数加收，负数减免。</p>
+                </div>
+                <button class="plain-button small" id="toggleRentAdjustBtn" type="button">展开全部</button>
+              </div>
+              <div class="rent-adjustment-grid compact-list" id="rentAdjustmentGrid"></div>
+            </section>
+          </div>
+        </section>
+      </form>
 
       <section class="tab-page" id="resultTab">
-        <div class="result-list" id="resultList"></div>
-        <section class="input-section">
-          <div class="section-title">
-            <h2>现金流概览</h2>
-            <p>展示项目净现金流前 36 期走势，便于手机快速判断回款节奏。</p>
-          </div>
-          <canvas id="cashflowChart" width="640" height="280" aria-label="现金流柱状图"></canvas>
-        </section>
-      </section>
+        <div class="section-stack">
+          <section class="input-section">
+            <div class="section-title">
+              <h2>核心结果</h2>
+              <p>关键利润、支付比例和 IRR 指标。</p>
+            </div>
+            <div class="result-list" id="resultList"></div>
+          </section>
 
-      <section class="tab-page" id="cashflowTab">
-        <div class="table-toolbar">
-          <div>
-            <h2>月度明细</h2>
-            <p>与原表 0-60 期现金流保持同口径。</p>
-          </div>
-          <button class="plain-button" id="exportBtn" type="button">导出 JSON</button>
-        </div>
-        <div class="table-wrap">
-          <table id="cashflowTable"></table>
+          <section class="input-section">
+            <div class="section-title">
+              <h2>风控判断</h2>
+              <p>基于初始支付比例、风险敞口和预计履行期数给出快速提示。</p>
+            </div>
+            <div class="risk-grid" id="riskList"></div>
+          </section>
+
+          <section class="input-section">
+            <div class="section-title">
+              <h2>现金流图表</h2>
+              <p>展示项目净现金流前 36 期走势。</p>
+            </div>
+            <canvas id="cashflowChart" width="640" height="280" aria-label="现金流柱状图"></canvas>
+          </section>
+
+          <section class="input-section">
+            <div class="table-toolbar">
+              <div>
+                <h2>月度明细</h2>
+                <p>与原表 0-60 期现金流保持同口径。</p>
+              </div>
+              <button class="plain-button" id="exportBtn" type="button">导出 JSON</button>
+            </div>
+            <div class="table-wrap">
+              <table id="cashflowTable"></table>
+            </div>
+          </section>
         </div>
       </section>
     </main>

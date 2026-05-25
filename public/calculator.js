@@ -11,6 +11,7 @@ const DEFAULTS = {
   rentAdjustments: { 1: 12168 },
   buyoutPrice: 2000,
   startDate: "2026-05-01",
+  expectedRunMonths: 10,
   financeDownRatio: 0.1,
   financeDepositRatio: 0,
   financeFeeRatio: 0.01,
@@ -49,6 +50,7 @@ const depreciationGrid = document.querySelector("#depreciationGrid");
 const rentAdjustmentGrid = document.querySelector("#rentAdjustmentGrid");
 let latestResult = null;
 let lastCommissionSource = "rate";
+let showAllRentAdjustments = false;
 
 const moneyFmt = new Intl.NumberFormat("zh-CN", {
   style: "currency",
@@ -127,16 +129,11 @@ function depreciationRate(age, rows) {
 function getInputs() {
   const data = { depreciation: [] };
   new FormData(form).forEach((value, key) => {
-    if (key === "startDate") {
-      data[key] = value || DEFAULTS.startDate;
-    } else {
-      data[key] = asNumber(value);
-    }
+    data[key] = key === "startDate" ? (value || DEFAULTS.startDate) : asNumber(value);
   });
   data.rentAdjustments = {};
   rentAdjustmentGrid.querySelectorAll("[data-period]").forEach((field) => {
-    const period = asNumber(field.dataset.period);
-    data.rentAdjustments[period] = asNumber(field.value);
+    data.rentAdjustments[asNumber(field.dataset.period)] = asNumber(field.value);
   });
   depreciationGrid.querySelectorAll(".depreciation-row").forEach((row) => {
     data.depreciation.push({
@@ -152,36 +149,21 @@ function rentAdjustmentFor(input, period) {
   if (input.rentAdjustments && Object.prototype.hasOwnProperty.call(input.rentAdjustments, period)) {
     return asNumber(input.rentAdjustments[period]);
   }
-  return period === 1 ? asNumber(input.firstRentAdjustment) : 0;
+  return 0;
 }
 
 function calculate(input) {
   const vehicleTotal = input.vehiclePrice + input.plateUseFee;
+  const runMonths = Math.max(0, Math.min(input.customerTerm, Math.round(input.expectedRunMonths || input.avgRunMonths)));
   const financeDownPayment = input.financeDownRatio * vehicleTotal;
   const financeDeposit = input.financeDepositRatio * vehicleTotal;
   const financeFee = input.financeFeeRatio * vehicleTotal;
   const financeBuyout = input.financeBuyoutRatio * vehicleTotal;
-  const financeMonthlyRent = pmt(
-    input.financeRate / 12,
-    input.financeTerm,
-    -vehicleTotal + financeDownPayment,
-    financeBuyout,
-    input.financePaymentMode
-  );
-  const financeIrr = rate(
-    input.financeTerm,
-    financeMonthlyRent,
-    -vehicleTotal + financeDeposit + financeDownPayment + financeFee,
-    financeBuyout - financeDeposit,
-    input.financePaymentMode
-  ) * 12;
+  const financeMonthlyRent = pmt(input.financeRate / 12, input.financeTerm, -vehicleTotal + financeDownPayment, financeBuyout, input.financePaymentMode);
+  const financeIrr = rate(input.financeTerm, financeMonthlyRent, -vehicleTotal + financeDeposit + financeDownPayment + financeFee, financeBuyout - financeDeposit, input.financePaymentMode) * 12;
   const annualCapitalCost = financeIrr;
-  const annualOrders = input.leadPrice === 0
-    ? 0
-    : input.trafficCostYear / input.leadPrice * input.conversionRate;
-  const fleetScale = input.avgRunMonths === 0 || input.utilization === 0
-    ? 0
-    : annualOrders / 12 * input.avgRunMonths / input.utilization;
+  const annualOrders = input.leadPrice === 0 ? 0 : input.trafficCostYear / input.leadPrice * input.conversionRate;
+  const fleetScale = input.avgRunMonths === 0 || input.utilization === 0 ? 0 : annualOrders / 12 * input.avgRunMonths / input.utilization;
   const adminCostPerMonth = fleetScale === 0 ? 0 : input.adminCostYear / fleetScale;
   const customerRentCashflows = Array.from({ length: 61 }, (_, item) => {
     const period = item <= input.customerTerm ? item : "";
@@ -223,7 +205,7 @@ function calculate(input) {
     let rentInterest = 0;
     let remainingPrincipal = 0;
     if (item === 0) {
-      remainingPrincipal = vehicleTotal - rentPrincipal;
+      remainingPrincipal = vehicleTotal;
     } else {
       const previous = rows[item - 1];
       rentInterest = previous.remainingPrincipal * customerAnnualRate / 12;
@@ -234,36 +216,26 @@ function calculate(input) {
     const age = inTerm ? input.initialAge + period : "";
     const depRate = age === "" ? 0 : depreciationRate(age, input.depreciation);
     const depAmount = input.vehiclePrice * depRate;
-    const residual = item === 0
-      ? input.vehiclePrice - depAmount
-      : age === "" ? 0 : rows[item - 1].residual - depAmount;
-    const capitalCost = inTerm && period <= input.avgRunMonths && item > 0
-      ? rows[item - 1].riskExposure * annualCapitalCost / 12
-      : 0;
-    const maintenance = inTerm && period <= input.avgRunMonths && item > 0 ? input.maintenanceYear / 12 : 0;
-    const insuranceCost = inTerm && period <= input.avgRunMonths && item > 0 ? input.insuranceYear / 12 : 0;
-    const batteryCost = inTerm && period <= input.avgRunMonths && item > 0 ? battery : 0;
-    const depreciationCost = inTerm && period <= input.avgRunMonths && item > 0 ? depAmount : 0;
-    const holdingCost = (capitalCost + maintenance + insuranceCost + batteryCost + depreciationCost) / input.utilization;
+    const residual = item === 0 ? input.vehiclePrice - depAmount : age === "" ? 0 : rows[item - 1].residual - depAmount;
+    const activeForProfit = inTerm && period <= runMonths;
+    const capitalCost = activeForProfit && item > 0 ? rows[item - 1].riskExposure * annualCapitalCost / 12 : 0;
+    const maintenance = activeForProfit && item > 0 ? input.maintenanceYear / 12 : 0;
+    const insuranceCost = activeForProfit && item > 0 ? input.insuranceYear / 12 : 0;
+    const batteryCost = activeForProfit && item > 0 ? battery : 0;
+    const depreciationCost = activeForProfit && item > 0 ? depAmount : 0;
+    const holdingCost = input.utilization === 0 ? 0 : (capitalCost + maintenance + insuranceCost + batteryCost + depreciationCost) / input.utilization;
     const acquisitionCost = item === 0 ? input.trafficCostYear / Math.max(fleetScale, 1) : 0;
     const commissionCost = item === 0 ? input.salesCommission : 0;
-    const adminCost = inTerm && period <= input.avgRunMonths && item > 0 ? adminCostPerMonth : 0;
+    const adminCost = activeForProfit && item > 0 ? adminCostPerMonth : 0;
     const operatingCost = holdingCost + acquisitionCost + commissionCost + adminCost;
     const serviceIncome = item === 0 ? input.serviceFee1 + input.serviceFee2 : 0;
-    const rentIncome = inTerm && period <= input.avgRunMonths ? rent : 0;
-    const buyoutIncome = inTerm && period <= input.avgRunMonths ? buyout * input.utilization : 0;
+    const rentIncome = activeForProfit ? rent : 0;
+    const buyoutIncome = activeForProfit ? buyout * input.utilization : 0;
     const weightedIncome = serviceIncome + rentIncome + buyoutIncome;
     const operatingProfit = weightedIncome - operatingCost;
-    const settleValue = fv(
-      input.financeRate / 12,
-      input.avgRunMonths,
-      financeMonthlyRent,
-      -vehicleTotal + financeDownPayment,
-      input.financePaymentMode
-    ) * (1 + input.earlySettlePenalty) - financeDeposit;
-    const disposalProfit = period === input.avgRunMonths
-      ? residual - settleValue - financeDownPayment - financeFee
-      : 0;
+    const settleValue = fv(input.financeRate / 12, runMonths, financeMonthlyRent, -vehicleTotal + financeDownPayment, input.financePaymentMode) * (1 + input.earlySettlePenalty) - financeDeposit;
+    const disposalProfit = period === runMonths ? residual - settleValue - financeDownPayment - financeFee : 0;
+
     rows.push({
       item,
       period,
@@ -273,10 +245,12 @@ function calculate(input) {
       projectCashflow,
       rentCashflow: customerRentCashflows[item],
       rent,
+      rentAdjust,
       buyout,
       remainingPrincipal,
       riskExposure,
       age,
+      depRate,
       residual,
       holdingCost,
       operatingCost,
@@ -293,6 +267,7 @@ function calculate(input) {
   return {
     input,
     rows,
+    runMonths,
     vehicleTotal,
     financeDownPayment,
     financeDeposit,
@@ -301,12 +276,14 @@ function calculate(input) {
     financeMonthlyRent,
     financeIrr,
     rentIrr: customerAnnualRate,
+    annualOrders,
     fleetScale,
     initialPayment,
     initialRiskExposure: rows[0].riskExposure,
     initialRatio: vehicleTotal === 0 ? 0 : initialPayment / vehicleTotal,
     totalOperatingProfit,
-    totalDisposalProfit
+    totalDisposalProfit,
+    currentDepRate: depreciationRate(input.initialAge, input.depreciation)
   };
 }
 
@@ -326,26 +303,47 @@ function renderSummary(result) {
   document.querySelector("#initialRatio").textContent = fmtPercent(result.initialRatio);
   document.querySelector("#rentIrr").textContent = fmtPercent(result.rentIrr);
   document.querySelector("#financeIrr").textContent = fmtPercent(result.financeIrr);
+  document.querySelector("#financeMonthlyRent").textContent = fmtMoney(result.financeMonthlyRent);
+  document.querySelector("#financeIrrInline").textContent = fmtPercent(result.financeIrr);
+  document.querySelector("#annualOrders").textContent = numberFmt.format(result.annualOrders);
+  document.querySelector("#fleetScale").textContent = `${numberFmt.format(result.fleetScale)} 台`;
+  document.querySelector("#vehicleTotal").textContent = fmtMoney(result.vehicleTotal);
+  document.querySelector("#currentDepRate").textContent = fmtPercent(result.currentDepRate);
 }
 
 function renderResultList(result) {
   const items = [
-    ["车价总计", fmtMoney(result.vehicleTotal)],
-    ["融资首付", fmtMoney(result.financeDownPayment)],
-    ["融资服务费", fmtMoney(result.financeFee)],
+    ["运营利润", fmtMoney(result.totalOperatingProfit)],
+    ["收车处置后利润", fmtMoney(result.totalDisposalProfit)],
+    ["客户首期支付", fmtMoney(result.initialPayment)],
+    ["初始风险敞口", fmtMoney(result.initialRiskExposure)],
+    ["初始支付比例", fmtPercent(result.initialRatio)],
+    ["租金年化 IRR", fmtPercent(result.rentIrr)],
+    ["预计履行期数", `${result.runMonths} 个月`],
     ["融资每期租金", fmtMoney(result.financeMonthlyRent)],
-    ["合同平均运行期数", `${result.input.avgRunMonths} 个月`],
-    ["估算管理规模", `${numberFmt.format(result.fleetScale)} 台`],
-    ["首期支付比例判断", result.initialRatio <= 0.15 ? "15% 以下" : "高于 15%"],
-    ["客户租金年化 IRR", fmtPercent(result.rentIrr)]
+    ["估算管理规模", `${numberFmt.format(result.fleetScale)} 台`]
   ];
   document.querySelector("#resultList").innerHTML = items
     .map(([label, value]) => `<article class="result-item"><span>${label}</span><strong>${value}</strong></article>`)
     .join("");
 }
 
+function renderRiskList(result) {
+  const ratioState = result.initialRatio <= 0.15 ? ["warn", "低于 15%", "首期支付比例偏低，建议关注风险敞口。"] : ["ok", "高于 15%", "首期支付比例达到关注线以上。"];
+  const exposureState = result.initialRiskExposure > result.vehicleTotal * 0.8 ? ["warn", "敞口较高", "初始风险敞口超过车价总计 80%。"] : ["ok", "敞口可控", "初始风险敞口处于可控区间。"];
+  const runState = result.runMonths > result.input.customerTerm ? ["danger", "期数异常", "预计履行期数不能超过合同期数。"] : ["ok", "期数有效", `按 ${result.runMonths} 个月计算利润和处置收益。`];
+  const items = [
+    ["初始支付比例", ...ratioState],
+    ["风险敞口", ...exposureState],
+    ["履约假设", ...runState]
+  ];
+  document.querySelector("#riskList").innerHTML = items
+    .map(([label, cls, value, desc]) => `<article class="risk-item ${cls}"><span>${label}</span><strong>${value}</strong><small>${desc}</small></article>`)
+    .join("");
+}
+
 function renderTable(result) {
-  const headers = ["期次", "日期", "收入", "支出", "净现金流", "租金", "剩余本金", "风险敞口", "当前残值", "运营利润", "处置收益"];
+  const headers = ["期次", "日期", "收入", "支出", "净现金流", "租金", "租金调整", "剩余本金", "风险敞口", "当前残值", "运营利润", "处置收益"];
   const body = result.rows
     .filter((row) => row.period !== "")
     .map((row) => {
@@ -356,6 +354,7 @@ function renderTable(result) {
         fmtMoney(row.cost),
         fmtMoney(row.projectCashflow),
         fmtMoney(row.rent),
+        fmtMoney(row.rentAdjust),
         fmtMoney(row.remainingPrincipal),
         fmtMoney(row.riskExposure),
         fmtMoney(row.residual),
@@ -408,6 +407,7 @@ function renderAll() {
   latestResult = calculate(input);
   renderSummary(latestResult);
   renderResultList(latestResult);
+  renderRiskList(latestResult);
   renderTable(latestResult);
   renderChart(latestResult);
   localStorage.setItem("subscriptionCalculatorInputs", JSON.stringify(input));
@@ -439,19 +439,19 @@ function renderRentAdjustments(values = getInputs()) {
     previous[field.dataset.period] = asNumber(field.value);
   });
   const source = { ...(values.rentAdjustments || {}), ...previous };
-  if (values.firstRentAdjustment !== undefined && source[1] === undefined) {
-    source[1] = asNumber(values.firstRentAdjustment);
-  }
   const term = Math.max(1, Math.min(60, Math.round(asNumber(values.customerTerm || DEFAULTS.customerTerm))));
   rentAdjustmentGrid.innerHTML = "";
   for (let period = 1; period <= term; period += 1) {
+    const value = source[period] ?? 0;
     const el = document.createElement("div");
-    el.className = "rent-adjustment-row";
+    el.className = `rent-adjustment-row ${asNumber(value) === 0 ? "is-zero" : "has-value"}`;
     el.innerHTML = `
-      <label>第 ${period} 期<input data-period="${period}" type="number" inputmode="decimal" value="${source[period] ?? 0}" /></label>
+      <label>第 ${period} 期<input data-period="${period}" type="number" inputmode="decimal" value="${value}" /></label>
     `;
     rentAdjustmentGrid.appendChild(el);
   }
+  rentAdjustmentGrid.classList.toggle("collapsed", !showAllRentAdjustments);
+  document.querySelector("#toggleRentAdjustBtn").textContent = showAllRentAdjustments ? "只看有调整" : "展开全部";
 }
 
 function syncCommission(changedName) {
@@ -492,12 +492,19 @@ form.addEventListener("input", (event) => {
   }
   renderAll();
 });
+
 rentAdjustmentGrid.addEventListener("input", renderAll);
 depreciationGrid.addEventListener("input", renderAll);
 window.addEventListener("resize", () => latestResult && renderChart(latestResult));
 
+document.querySelector("#toggleRentAdjustBtn").addEventListener("click", () => {
+  showAllRentAdjustments = !showAllRentAdjustments;
+  renderRentAdjustments(getInputs());
+});
+
 document.querySelector("#resetBtn").addEventListener("click", () => {
   localStorage.removeItem("subscriptionCalculatorInputs");
+  showAllRentAdjustments = false;
   setDefaults();
   renderAll();
 });
