@@ -152,6 +152,23 @@ function rentAdjustmentFor(input, period) {
   return 0;
 }
 
+function customerRentDueAt(input, item) {
+  if (item > input.customerTerm) return { rentPlan: 0, rentAdjust: 0 };
+  if (input.paymentMode === 1) {
+    if (item >= input.customerTerm) return { rentPlan: 0, rentAdjust: 0 };
+    const duePeriod = item + 1;
+    return {
+      rentPlan: input.monthlyRent,
+      rentAdjust: rentAdjustmentFor(input, duePeriod)
+    };
+  }
+  if (item === 0) return { rentPlan: 0, rentAdjust: 0 };
+  return {
+    rentPlan: input.monthlyRent,
+    rentAdjust: rentAdjustmentFor(input, item)
+  };
+}
+
 function calculate(input) {
   const vehicleTotal = input.vehiclePrice + input.plateUseFee;
   const runMonths = Math.max(0, Math.min(input.customerTerm, Math.round(input.expectedRunMonths || input.avgRunMonths)));
@@ -167,10 +184,10 @@ function calculate(input) {
   const adminCostPerMonth = fleetScale === 0 ? 0 : input.adminCostYear / fleetScale;
   const customerRentCashflows = Array.from({ length: 61 }, (_, item) => {
     const period = item <= input.customerTerm ? item : "";
-    if (item === 0) return -vehicleTotal + input.serviceFee1 + input.serviceFee2;
     if (period === "") return 0;
-    const rentPlan = input.paymentMode === 1 && period === input.customerTerm ? 0 : input.monthlyRent;
-    return rentPlan + rentAdjustmentFor(input, period);
+    const rentDue = customerRentDueAt(input, item);
+    const initialOutflow = item === 0 ? -vehicleTotal + input.serviceFee1 + input.serviceFee2 : 0;
+    return initialOutflow + rentDue.rentPlan + rentDue.rentAdjust;
   });
   const customerAnnualRate = irr(customerRentCashflows) * 12;
   const rows = [];
@@ -182,11 +199,9 @@ function calculate(input) {
     const service1 = item === 0 ? input.serviceFee1 : 0;
     const service2 = item === 0 ? input.serviceFee2 : 0;
     const depositIn = item === 0 ? input.deposit : 0;
-    const rentPlan = !inTerm ? 0
-      : input.paymentMode === 1 && period === input.customerTerm ? 0
-        : input.paymentMode === 0 && period === 0 ? 0
-          : input.monthlyRent;
-    const rentAdjust = inTerm ? rentAdjustmentFor(input, period) : 0;
+    const rentDue = inTerm ? customerRentDueAt(input, item) : { rentPlan: 0, rentAdjust: 0 };
+    const rentPlan = rentDue.rentPlan;
+    const rentAdjust = rentDue.rentAdjust;
     const rent = rentPlan + rentAdjust;
     const buyout = period === input.customerTerm ? input.buyoutPrice : 0;
     const revenue = service1 + service2 + depositIn + rent + buyout;
