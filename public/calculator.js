@@ -154,18 +154,16 @@ function rentAdjustmentFor(input, period) {
 
 function customerRentDueAt(input, item) {
   if (item > input.customerTerm) return { rentPlan: 0, rentAdjust: 0 };
+  const rentAdjust = item > 0 ? rentAdjustmentFor(input, item) : 0;
   if (input.paymentMode === 1) {
-    if (item >= input.customerTerm) return { rentPlan: 0, rentAdjust: 0 };
-    const duePeriod = item + 1;
     return {
-      rentPlan: input.monthlyRent,
-      rentAdjust: rentAdjustmentFor(input, duePeriod)
+      rentPlan: item < input.customerTerm ? input.monthlyRent : 0,
+      rentAdjust
     };
   }
-  if (item === 0) return { rentPlan: 0, rentAdjust: 0 };
   return {
-    rentPlan: input.monthlyRent,
-    rentAdjust: rentAdjustmentFor(input, item)
+    rentPlan: item === 0 ? 0 : input.monthlyRent,
+    rentAdjust
   };
 }
 
@@ -186,7 +184,7 @@ function calculate(input) {
     const period = item <= input.customerTerm ? item : "";
     if (period === "") return 0;
     const rentDue = customerRentDueAt(input, item);
-    const initialOutflow = item === 0 ? -vehicleTotal + input.serviceFee1 + input.serviceFee2 : 0;
+    const initialOutflow = item === 0 ? -vehicleTotal : 0;
     return initialOutflow + rentDue.rentPlan + rentDue.rentAdjust;
   });
   const customerAnnualRate = irr(customerRentCashflows) * 12;
@@ -276,6 +274,7 @@ function calculate(input) {
   }
 
   const initialPayment = rows[0].revenue;
+  const projectAnnualRate = irr(rows.map((row) => row.projectCashflow)) * 12;
   const totalOperatingProfit = rows.reduce((sum, row) => sum + row.operatingProfit, 0);
   const totalDisposalProfit = rows.reduce((sum, row) => sum + row.operatingProfit + row.disposalProfit, 0);
 
@@ -290,7 +289,7 @@ function calculate(input) {
     financeBuyout,
     financeMonthlyRent,
     financeIrr,
-    rentIrr: customerAnnualRate,
+    rentIrr: projectAnnualRate,
     annualOrders,
     fleetScale,
     initialPayment,
