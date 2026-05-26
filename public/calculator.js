@@ -167,7 +167,7 @@ function calculate(input) {
   const adminCostPerMonth = fleetScale === 0 ? 0 : input.adminCostYear / fleetScale;
   const customerRentCashflows = Array.from({ length: 61 }, (_, item) => {
     const period = item <= input.customerTerm ? item : "";
-    if (item === 0) return -vehicleTotal;
+    if (item === 0) return -vehicleTotal + input.serviceFee1 + input.serviceFee2;
     if (period === "") return 0;
     const rentPlan = input.paymentMode === 1 && period === input.customerTerm ? 0 : input.monthlyRent;
     return rentPlan + rentAdjustmentFor(input, period);
